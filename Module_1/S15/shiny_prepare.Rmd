@@ -1,0 +1,124 @@
+---
+title: "intro_to_shiny"
+author: "Valeriia Vasylieva"
+date: '2025-03-03'
+---
+
+## Before the class
+
+Ми розробимо додаток, що хоститься локально, і відображає декілька даних із 
+статті працівників Антарктичної станції Вернадського. 
+Можете почитати статтю, але це не обов'язково.
+https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13015 
+
+### Set full working directory
+
+```{r results='hide'}
+# For example, "/home/user/Documents/M1S15/"
+setwd("./")
+```
+
+### Check needed packages
+
+```{r results='hide'}
+require(shiny)
+require(DT)
+require(ggplot2)
+```
+
+### Download and unarchive data in working directory
+
+* Past link in browser
+  https://www.ncei.noaa.gov/archive/archive-management-system/OAS/bin/prd/jquery/download/171619.1.1.tar.gz 
+* Transfer archive to your working directory
+* Unarchive the file
+
+
+
+
+
+## During the class
+
+### Fill pre-required data
+
+```{r}
+data_path0<-"0171619.1.1/0171619/1.1/data/0-data/"
+headerphoto<-"NCEI 0171619.jpg"
+data_path<-"0171619.1.1/0171619/1.1/data/1-data/"
+datasets<-c("","attendance v1-0-DATA.csv","interval v1-0-DATA.csv","repro v1-1-DATA.csv","validation v1-1-DATA.csv")
+metadatas<-c("","attendance v1-0-READ ME.txt","interval v1-0- READ ME.txt","repro v1-1-READ ME.txt","validation v1-1-READ ME.txt")
+names(metadatas) <- datasets
+page.title<-"Estimating nest-level phenology and reproductive success of colonial seabirds using time-lapse cameras"
+paper.link<-"https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13015"
+```
+
+### Cheet 1 | data
+
+```{r}
+# Ensure input is not NULL
+  req(input$dataset)  
+  # Load data
+  df <- read.csv(file.path(wd(),data_path, input$dataset))
+  # Drop columns with no values
+  df <- df[,colSums(is.na(df))<nrow(df)]
+  #Fill NA
+  df[is.na(df)] <- "NA"
+  # Convert only character columns to factors
+  char_cols <- sapply(df, is.character)
+  df[char_cols] <- lapply(df[char_cols], as.factor)
+  # Convert string to date type
+  if ("DATE" %in% names(df)){
+    df$DATE<-as.Date(as.character(df$DATE), format = "%d/%m/%Y")
+  }
+  # Give back the data
+  return(df)
+```
+
+### Cheet 2 | metadata
+
+```{r}
+# Ensure input is not NULL
+req(input$dataset)  
+# Assemble file path
+fileName <- file.path(wd(),data_path, metadatas[input$dataset])  
+# Read entire file as text
+if (file.exists(fileName)) {
+  return(paste(readLines(fileName), collapse = "\n")) 
+} else {
+  return("Metadata file not found.")
+}
+```
+
+### Cheet 3 | plot data
+
+```{r}
+req(input$upload)
+# Get file extention
+ext <- tools::file_ext(input$upload$name)
+# Validate .csv file extention
+switch(ext,
+       csv = vroom::vroom(input$upload$datapath, delim = ","),
+       validate("Invalid file; Please upload a .csv file")
+)
+# Load the data
+df <- read.csv(paste0(wd(),input$upload$name))
+# Transform string to numerical 
+df$Latitude <- as.numeric(gsub("−", "-", df$Latitude))
+df$Longitude <- as.numeric(gsub("−", "-", df$Longitude))
+# Give back the data
+return(df)
+```
+
+### Cheet 4 | plot
+
+```{r}
+ggplot(species_locality_data(), aes(x = Longitude, y = Latitude, shape = Species, color = Species)) +
+  geom_point(size = 4, position = "jitter") +  # Adjust point size
+  scale_shape_manual(values = c("Adélie" = 16, "Gentoo" = 17, "Chinstrap" = 15)) +
+  scale_color_manual(values = c("Adélie" = "black", "Gentoo" = "red", "Chinstrap" = "blue")) +
+  theme_minimal() +
+  labs(title = "Penguin Localities", x = "Longitude", y = "Latitude") +
+  theme(legend.title = element_blank())
+```
+
+
