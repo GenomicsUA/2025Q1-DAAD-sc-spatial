@@ -13,6 +13,7 @@ https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13015
 
 Для тих, хто захоче зануритися в тему глибже:
 * Настільна книга https://mastering-shiny.org/index.html
+* Shiny Cheat Sheets https://rstudio.github.io/cheatsheets/html/shiny.html
 * Як ділитися своїми застосунками https://shiny.posit.co/r/getstarted/shiny-basics/lesson7/
 
 ### Set full working directory
