@@ -1,0 +1,115 @@
+---
+title: "Harmony_tutorial"
+output: html_document
+date: "2025-03-05"
+---
+
+```{r echo=TRUE,results="hide", message=FALSE, warning=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("harmony")
+BiocManager::install('glmGamPoi')
+```
+
+
+```{r echo=TRUE,results="hide", message=FALSE, warning=FALSE}
+library(harmony)
+library(Seurat)
+library(dplyr)
+library(glmGamPoi)
+```
+
+
+Для цього туторіалу ми використовуватимемо дані з секвенування РНК поодиноких клітин з  [Kang et al., 2017](https://www.nature.com/articles/nbt.4042) (Мононуклеарні клітини периферичної крові, контроль і стимульовані інтерфероном бета)
+
+```{r echo=TRUE,results="hide", message=FALSE, warning=FALSE}
+data("pbmc_stim")
+pbmcs_ctrl<-CreateSeuratObject(pbmc.ctrl, project="pbmc")
+pbmcs_stim<-CreateSeuratObject(pbmc.stim, project="pbmc")
+pbmcs<-merge(x=pbmcs_ctrl, y=pbmcs_stim, merge.data=TRUE)
+```
+
+Коли ми створили об'єкти Seurat, Варто додати колонку з кондицією до метаданих.
+
+```{r echo=TRUE,results="hide", message=FALSE, warning=FALSE}
+Conditions<-c(rep("Control", length(pbmc.ctrl[1,])), rep("Stimulated", length(pbmc.stim[1,])))
+pbmcs[["Condition"]]<-Conditions
+```
+
+Коли ви працюєте з сирими даними, варто відфільтрувати клітини з високою експресією мітохондріальних генів та клітини із занизькою кількістю прочитань. Щоб додати колонку з відсотками мітохондріальних генів, потрібно виконати наступний рядок коду:
+
+
+```{r echo=TRUE,results="hide", message=FALSE, warning=FALSE}
+pbmcs[["percent.mt"]]<-PercentageFeatureSet(pbmcs, pattern="^MT-")
+```
+
+Тепер можна перевірити розподіли головних параметрів нашого Seurat об'єкту:
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+VlnPlot(pbmcs, features = c("nCount_RNA","nFeature_RNA","percent.mt"))
+```
+
+
+Як бачимо, дані, що ми взяли у якості інпуту були вже попередньо відфільтровані, тому жодних додаткових маніпуляцій для фільтрування виконувати не потрібно. Але якби у вас на вході були сирі дані, вам обов'язково потрібно було би виконати quality control перед наступними кроками таким чином, як ви розглядали на занятті M2S03.
+
+(ми з вами теж могли би працювати з сирими даними, та на жаль сайт NCBI не працює) :(
+
+
+Давайте спершу поглянемо на те, як виглядатиме кластеризація без спеціальної інтеграції даних двох датасетів.
+
+Виконаємо всі класичні етапи препроцесингу даних перед тим як робити кластеризацію з подальшою анотацією клітинних типів. Ми використовуватимемо для цього SCTransform:
+
+```{r echo=TRUE, results="hide", message=FALSE, warning=FALSE}
+pbmcs <- pbmcs %>%
+    NormalizeData() %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    ScaleData() %>%
+    SCTransform(vars.to.regress = c("percent.mt"))
+```
+
+Після цього, ми виконуємо РСА та базуючись на ліктьовому графіку обираємо кількість головних компонент для подальшого аналізу.
+
+```{r echo=TRUE, results="hide", message=FALSE, warning=FALSE}
+pbmcs <- RunPCA(pbmcs, assay = "SCT", npcs = 50)
+```
+
+```{r echo=TRUE}
+ElbowPlot(pbmcs)
+```
+
+
+На цьому графіку позицію ліктя можна побачити приблизно на 7мій компоненті, отже для подальших дій ми використовуватимемо РС 1-7.
+
+Давайте виконаємо нелінійне зменшення розмірності UMAP та поглянемо на отримані групи, що є в даних.
+
+```{r echo=TRUE, results="hide", message=FALSE, warning=FALSE}
+pbmcs<-RunUMAP(pbmcs, reduction = "pca", assay = "SCT", dims = 1:7)
+```
+
+```{r echo=TRUE}
+DimPlot(pbmcs, reduction = "umap", group.by = "Condition")
+```
+
+
+Ми можемо спостерігати, що дані кластеризуються базуючись на кондиції: окремо бачимо групи клітин контролю, окремо групи стимульованих клітин. Це вносить суттєвий шум у подальший аналіз.
+
+Саме тому варто провести інтеграцію датасетів за допомогою спеціальних функцій. У даному випадку це буде функція RunHarmony з пакету Harmony.
+
+```{r echo=TRUE, results="hide", message=FALSE, warning=FALSE}
+harmonized_seurat <- RunHarmony(pbmcs, 
+                                group.by.vars = c("Condition"), 
+                                reduction = "pca", assay.use = "SCT", reduction.save = "harmony")
+```
+
+Скористаємось знову методом UMAP та глянемо чи змінилися групи на графіку.
+
+```{r echo=TRUE, results="hide", message=FALSE, warning=FALSE}
+harmonized_seurat <- RunUMAP(harmonized_seurat, reduction = "harmony", assay = "SCT", dims = 1:7)
+```
+
+```{r echo=TRUE}
+DimPlot(harmonized_seurat, reduction = "umap", group.by = "Condition")
+```
+
+
+Тепер ми з більшою ймовірністю можемо припустити, що кластери репрезентують клітинні типи та/або стани, і тепер можна аналізувати диференційну експресію генів між кондиціями  та знаходити клітинні субпопуляції, які значуще відрізняються між кондиціями :)
