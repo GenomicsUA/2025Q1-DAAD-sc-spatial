@@ -22,31 +22,25 @@ library(glmGamPoi)
 
 Для цього туторіалу ми використовуватимемо дані з секвенування РНК поодиноких клітин з  [Kang et al., 2017](https://www.nature.com/articles/nbt.4042) (Мононуклеарні клітини периферичної крові, контроль і стимульовані інтерфероном бета)
 
+До обох датасетів ми додамо колонки з кондицією до метаданих та порахуємо відсоток експресії мітохондріальних генів
 ```{r echo=TRUE,results="hide", message=FALSE, warning=FALSE}
 data("pbmc_stim")
 pbmcs_ctrl<-CreateSeuratObject(pbmc.ctrl, project="pbmc")
+pbmcs_ctrl[["Condition"]]<-rep("Stimulated", length(pbmc.stim[1,]))
+pbmcs_ctrl[["percent.mt"]]<-PercentageFeatureSet(pbmcs_ctrl, pattern="^MT-")
+
 pbmcs_stim<-CreateSeuratObject(pbmc.stim, project="pbmc")
-pbmcs<-merge(x=pbmcs_ctrl, y=pbmcs_stim, merge.data=TRUE)
+pbmcs_stim[["Condition"]]<-rep("Control", length(pbmc.ctrl[1,]))
+pbmcs_stim[["percent.mt"]]<-PercentageFeatureSet(pbmcs_stim, pattern="^MT-")
+
+pbmcs<-merge(pbmcs_ctrl, pbmcs_stim)
 ```
 
-Коли ми створили об'єкти Seurat, Варто додати колонку з кондицією до метаданих.
-
-```{r echo=TRUE,results="hide", message=FALSE, warning=FALSE}
-Conditions<-c(rep("Control", length(pbmc.ctrl[1,])), rep("Stimulated", length(pbmc.stim[1,])))
-pbmcs[["Condition"]]<-Conditions
-```
-
-Коли ви працюєте з сирими даними, варто відфільтрувати клітини з високою експресією мітохондріальних генів та клітини із занизькою кількістю прочитань. Щоб додати колонку з відсотками мітохондріальних генів, потрібно виконати наступний рядок коду:
-
-
-```{r echo=TRUE,results="hide", message=FALSE, warning=FALSE}
-pbmcs[["percent.mt"]]<-PercentageFeatureSet(pbmcs, pattern="^MT-")
-```
-
-Тепер можна перевірити розподіли головних параметрів нашого Seurat об'єкту:
+Тепер можна перевірити розподіли головних параметрів наших Seurat об'єктів:
 
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
-VlnPlot(pbmcs, features = c("nCount_RNA","nFeature_RNA","percent.mt"))
+VlnPlot(pbmcs_ctrl, features = c("nCount_RNA","nFeature_RNA","percent.mt"))
+VlnPlot(pbmcs_stim, features = c("nCount_RNA","nFeature_RNA","percent.mt"))
 ```
 
 
