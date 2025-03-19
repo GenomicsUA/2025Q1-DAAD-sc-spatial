@@ -12,9 +12,6 @@
 # Alternatively: 
 # download https://cf.10xgenomics.com/samples/cell/pbmc3k/pbmc3k_filtered_gene_bc_matrices.tar.gz 
 
-pbmc.data <- Read10X(data.dir = "/Users/mkorshe/Documents/DAAD2025/scrna/filtered_gene_bc_matrices/hg19/")
-# Initialize the Seurat object with the raw (non-normalized data).
-pbmc <- CreateSeuratObject(counts = pbmc.data, project = "pbmc3k", min.cells = 3, min.features = 200)
 
 pbmc.data <- Read10X(data.dir = "/Users/mkorshe/Documents/DAAD2025/scrna/filtered_gene_bc_matrices/hg19/")
 # Initialize the Seurat object with the raw (non-normalized data).
@@ -96,12 +93,19 @@ pbmc.markers %>%
   slice_head(n = 10) %>%
   ungroup() -> top10
 DoHeatmap(pbmc, features = top10$gene) + NoLegend()
-
 new.cluster.ids <- c("Naive CD4 T", "CD14+ Mono", "Memory CD4 T", "B", "CD8 T", "FCGR3A+ Mono",
-                     "NK", "DC", "Platelet")
+                     "NK", "DC", "Platelet",'other')
 names(new.cluster.ids) <- levels(pbmc)
 pbmc <- RenameIdents(pbmc, new.cluster.ids)
 DimPlot(pbmc, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+
+# 
+# 
+# new.cluster.ids <- c("Naive CD4 T", "CD14+ Mono", "Memory CD4 T", "B", "CD8 T", "FCGR3A+ Mono",
+#                      "NK", "DC", "Platelet")
+# names(new.cluster.ids) <- levels(pbmc)
+# pbmc <- RenameIdents(pbmc, new.cluster.ids)
+# DimPlot(pbmc, reduction = "umap", label = TRUE, pt.size = 0.5) #+ NoLegend()
 
 FeaturePlot(pbmc, features = c("MS4A1", "GNLY", "CD3E", "CD14", "FCER1A", "FCGR3A", "LYZ", "PPBP",
                                "CD8A"))
@@ -127,8 +131,8 @@ FeaturePlot(pbmc, features = c("MS4A1", "CD79A"), blend = TRUE)
 
 pbmc <- SCTransform(pbmc)
 
-pbmc_data_SCT<- AggregateExpression(pbmc, assays = "SCT", return.seurat = F, group.by = c( "seurat_clusters"))
-
+pbmc_data_SCT<- AggregateExpression(pbmc, assays = "RNA", return.seurat = F, group.by = c( "seurat_clusters"))
+pbmc_data_SCT <- as.data.frame(pbmc_data_SCT)
 pbmc3k.final.no.umap <- pbmc
 pbmc3k.final.no.umap[["umap"]] <- NULL
 DimPlot(pbmc3k.final.no.umap) + RotatedAxis()

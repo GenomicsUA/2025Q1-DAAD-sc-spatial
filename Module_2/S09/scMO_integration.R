@@ -1,13 +1,15 @@
 # install.packages('Signac')
 # BiocManager::install("EnsDb.Hsapiens.v86")
-#BiocManager::install("BSgenome.Hsapiens.UCSC.hg38")
-#remotes::install_github("mojaveazure/seurat-disk")
+# BiocManager::install("BSgenome.Hsapiens.UCSC.hg38")
+# remotes::install_github("mojaveazure/seurat-disk")
 
 
 
 library(Seurat)
 library(Signac)
 library(SeuratDisk)
+
+library(AnnotationHub)
 
 library(EnsDb.Hsapiens.v86)
 library(ggplot2)
@@ -46,13 +48,19 @@ pbmc[["ATAC"]] <- CreateChromatinAssay(
   annotation = annotation
 )
 
+rm(counts)
+rm(annotation)
 #### QC ####
 
 DefaultAssay(pbmc) <- "ATAC"
 
 pbmc <- NucleosomeSignal(pbmc) #Calculate the strength of the nucleosome signal per cell. Computes the ratio of fragments between 147 bp and 294 bp (mononucleosome) to fragments < 147 bp (nucleosome-free)
+#pbmc@meta.data$nucleosome_signal
+# hist(pbmc@meta.data$nucleosome_signal)
 
 pbmc <- TSSEnrichment(pbmc) #Compute the transcription start site (TSS) enrichment score for each cell, as defined by ENCODE: https://www.encodeproject.org/data-standards/terms/.
+
+hist(pbmc@meta.data$TSS.enrichment)
 
 DensityScatter(pbmc, x = 'nCount_ATAC', y = 'TSS.enrichment', log_x = TRUE, quantiles = TRUE) 
 
@@ -89,6 +97,8 @@ pbmc <- FindTopFeatures(pbmc, min.cutoff = 5)
 pbmc <- RunTFIDF(pbmc)
 pbmc <- RunSVD(pbmc)
 
+
+
 #### Annotating cell types #### 
 
 library(SeuratDisk)
@@ -98,8 +108,7 @@ library(SeuratDisk)
 # 2Gb file 
 
 #https://stuartlab.org/signac/articles/pbmc_multiomic 
-rm(counts)
-rm(annotation)
+
 #rm(reference)
 
 reference <- LoadH5Seurat("pbmc_multimodal.h5seurat", assays = list("SCT" = "counts"), reductions = 'spca')
@@ -198,6 +207,24 @@ p2 <- CoveragePlot(
 )
 
 patchwork::wrap_plots(p1, p2, ncol = 1)
+###
+
+# Signac 
+
+DefaultAssay(pbmc) <- "ATAC"
+pbmc <- FindTopFeatures(pbmc, min.cutoff = 50)
+
+p1 <- ElbowPlot(seurat, ndims = 30, reduction="lsi")
+p2 <- DepthCor(seurat, n = 30)
+p1 | p2
+
+seurat <- FindMultiModalNeighbors(seurat,
+                                  reduction.list = list("css_rna", "css_atac"),
+                                  dims.list = list(1:ncol(Embeddings(seurat,"css_rna")),
+                                                   1:ncol(Embeddings(seurat,"css_atac"))),
+                                  modality.weight.name = c("RNA.weight","ATAC.weight"),
+                                  verbose = TRUE)
+
 
 
 
@@ -313,5 +340,76 @@ coembed <- RunUMAP(coembed, dims = 1:30)
 
 DimPlot(coembed, group.by = c("orig.ident", "seurat_annotations"))
 
-####
+#### Part 3 ####
 
+#як визначити кількість клітин у кожному кластері?
+
+N_cells_df <- as.data.frame(table(coembed@meta.data$seurat_annotations))
+N_cells_df <- N_cells_df[order(N_cells_df$Freq, decreasing = T),]
+
+
+devtools::install_github("immunogenomics/presto")
+
+library(presto)
+
+seurat <- coembed
+DefaultAssay(seurat) <- "RNA"
+
+seurat<- JoinLayers(seurat, overwrite = TRUE)
+
+
+DE_ct <- wilcoxauc(seurat, "seurat_annotations", seurat_assay = "RNA")
+library(dplyr)
+top_markers_ct <- DE_ct %>%
+  filter(abs(logFC) > log(1.2) &
+           padj < 0.01 &
+           auc > 0.65 &
+           pct_in - pct_out > 30 &
+           pct_out < 20) %>%
+  group_by(group) %>%
+  top_n(10, wt = auc)
+
+top_markers_ct # 
+
+## аналогічно ми можемо провести групування за іншими параметрами мета даних
+# 
+# data_2 <- readRDS('/Users/mkorshe/Documents/DAAD2025/scrna/data/d60e4064-c784-436b-8e63-026d9242bfbc.rds')
+# 
+# # Проаналізуйте метадану цього обєкту
+# str(data_2)
+# data_2$donor_assay
+# dim(data_2)
+# 
+# table(data_2$donor_id)
+# table(data_2$method)
+# 
+# #BiocManager::install("clusterProfiler")
+# data_2_by_donor <- SplitObject(data_2, split.by = "donor_id")
+# 
+# data_2_by_donor1 <- data_2_by_donor$TSP5
+# 
+# data_2_by_donor1_and_2 <- merge(x = data_2_by_donor$TSP5, y = data_2_by_donor$TSP14)
+# #table(data_2_by_donor1_and_2$donor_id)
+# 
+# # get pseudobulk 
+# bulk <- AggregateExpression(data_2, assays = 'RNA',group.by = c("donor_id", "cell_type"), return.seurat = F)
+# bulk <- as.data.frame(bulk)
+# 
+# ###
+# 
+# N_cells_df2 <- as.data.frame(table(data_2@meta.data$cell_type))
+# N_cells_df2 <- N_cells_df2[order(N_cells_df2$Freq, decreasing = T),]
+
+# Як визначити диференційно експресовані гени для кожного кластеру?
+coembed <- JoinLayers(coembed)
+pbmc.markers <- FindAllMarkers(pbmc.rna, only.pos = TRUE)
+
+
+#
+FeaturePlot(coembed, features = c("MS4A1", "GNLY", "CD3E", "CD14", "FCER1A", "FCGR3A", "LYZ", "PPBP",  "CD8A"))
+
+
+
+
+# cell_specudobulk <- as.ma
+#### Common commands #### 
