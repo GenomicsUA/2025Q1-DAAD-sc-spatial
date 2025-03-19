@@ -1,6 +1,16 @@
 
-library(Seurat)
 
+library(Seurat)
+library(Signac)
+library(SeuratDisk)
+
+library(AnnotationHub)
+
+library(EnsDb.Hsapiens.v86)
+library(ggplot2)
+library(cowplot)
+library(SeuratData)
+library(BSgenome.Hsapiens.UCSC.hg38)
 
 # InstallData("pbmcsca")
 obj <- LoadData("pbmcsca")
