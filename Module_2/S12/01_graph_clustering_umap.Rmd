@@ -1,0 +1,120 @@
+---
+title: An R Markdown document converted from "01_graph_clustering_umap.ipynb"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(clustree)
+library(cluster)
+library(ggplot2)
+library(dplyr)
+
+# BiocManager::install('glmGamPoi')
+# devtools::install_github("immunogenomics/presto")
+```
+
+```{r}
+count_matrix <- read.delim("GBM_raw_gene_counts.csv", sep = " ", check.names = FALSE)
+metadata <- read.delim("GBM_metadata.csv", sep = " ", check.names = FALSE, row.names = 1)
+```
+
+```{r}
+metadata <- metadata %>% select(Selection, Location)
+```
+
+```{r}
+# Create a Seurat object
+seurat_object <- CreateSeuratObject(counts = count_matrix, meta.data = metadata, min.cells = 3, min.features = 200)
+
+# Standard workflow
+seurat_object <- SCTransform(seurat_object, verbose = FALSE)
+seurat_object <- RunPCA(seurat_object, features = VariableFeatures(object = seurat_object))
+seurat_object <- FindNeighbors(seurat_object, dims = 1:30)
+seurat_object <- FindClusters(seurat_object, resolution = 0.5)
+seurat_object <- RunUMAP(seurat_object, dims = 1:30)
+```
+
+```{r}
+DimPlot(seurat_object, reduction = "umap", group.by = "Selection", label = TRUE, label.box = TRUE, repel = TRUE) + NoLegend()
+DimPlot(seurat_object, reduction = "umap", group.by = "Location", label = TRUE, label.box = TRUE, repel = TRUE) + NoLegend()
+DimPlot(seurat_object, reduction = "umap", label = TRUE, label.box = TRUE, repel = TRUE) + NoLegend()
+```
+
+```{r}
+# Testing multiple clustering resolutions
+seurat_object <- FindClusters(seurat_object, resolution = seq(from = 0.2, to = 2, by = 0.2))
+```
+
+```{r}
+seurat_object@meta.data
+```
+
+```{r}
+# Draw cluster tree with clustree to assess stability across resolutions
+clustree(seurat_object, prefix = "SCT_snn_res.")
+```
+
+```{r}
+pca_embeddings
+```
+
+```{r}
+# Compute silhouette scores based on PCA embeddings to evaluate clustering quality
+pca_embeddings <- Embeddings(seurat_object, reduction = "pca")
+dist_matrix <- dist(pca_embeddings)
+
+sil_scores <- sapply(resolutions, function(res) {
+  # Extract clustering for the given resolution and convert to numeric factor
+  cluster_ids <- as.numeric(as.factor(seurat_object@meta.data[[paste0("RNA_snn_res.", res)]]))
+  sil <- silhouette(cluster_ids, dist_matrix)
+  mean(sil[, 3])
+})
+
+# Create a dataframe of average silhouette widths
+sil_df <- data.frame(Resolution = resolutions, Avg_Silhouette = sil_scores)
+print(sil_df)
+
+# Plot average silhouette width vs. clustering resolution
+ggplot(sil_df, aes(x = Resolution, y = Avg_Silhouette)) +
+  geom_line() +
+  geom_point() +
+  theme_minimal() +
+  labs(title = "Average Silhouette Score Across Clustering Resolutions",
+       y = "Average Silhouette Width")
+```
+
+```{r}
+seurat_object <- FindClusters(seurat_object, resolution = 0.2)
+```
+
+```{r}
+DimPlot(seurat_object, reduction = "umap", label = TRUE, label.box = TRUE, repel = TRUE) + NoLegend()
+```
+
+```{r}
+FeaturePlot(seurat_object, features = "PTPRC")
+FeaturePlot(seurat_object, features = "THY1")
+FeaturePlot(seurat_object, features = "OLIG1")
+```
+
+```{r}
+markers <- FindMarkers(seurat_object, ident.1 = "0", ident.2 = "2", min.diff.pct = 0.25)
+```
+
+```{r}
+markers %>% filter(abs(avg_log2FC) > 0.5, p_val_adj < 0.05) %>% arrange(desc(avg_log2FC))
+```
+
+```{r}
+library(SeuratDisk)
+```
+
+```{r}
+SaveH5Seurat(seurat_object, filename = "01_object.h5Seurat")
+```
+
+```{r}
+Convert("01_object.h5Seurat", dest = "h5ad", overwrite = TRUE)
+```
+

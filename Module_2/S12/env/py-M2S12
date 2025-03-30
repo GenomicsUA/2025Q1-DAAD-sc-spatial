@@ -1,0 +1,16 @@
+name: py-M2S12
+channels:
+  - conda-forge
+dependencies:
+  - pip
+  - python=3.11
+  - pip:
+    - hdbscan==0.8.40
+    - ipykernel==6.29.5
+    - ivis==2.0.11
+    - keras==2.12.0
+    - numpy==1.24.4
+    - phate==1.0.11
+    - scanpy==1.11.0
+    - tensorflow==2.12.0
+    - trimap==1.1.4

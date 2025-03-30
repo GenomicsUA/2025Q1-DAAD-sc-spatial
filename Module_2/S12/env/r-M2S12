@@ -1,0 +1,19 @@
+name: r-M2S12
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - anndata
+  - bioconda::bioconductor-glmgampoi
+  - ipykernel
+  - jupyter
+  - pandas
+  - r-cluster
+  - r-clustree
+  - r-devtools
+  - conda-forge::r-hdf5r
+  - r-irkernel
+  - r-reticulate
+  - r-sceasy
+  - r-seurat
+  - scanpy
