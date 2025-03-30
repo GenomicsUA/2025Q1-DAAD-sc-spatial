@@ -3,6 +3,10 @@ title: An R Markdown document converted from "01_graph_clustering_umap.ipynb"
 output: html_document
 ---
 
+# M2S13.01: Exploring alternative clustering methods
+
+## 01.1. Library and files loading
+
 ```{r}
 library(Seurat)
 library(clustree)
@@ -15,13 +19,15 @@ library(dplyr)
 ```
 
 ```{r}
-count_matrix <- read.delim("GBM_raw_gene_counts.csv", sep = " ", check.names = FALSE)
-metadata <- read.delim("GBM_metadata.csv", sep = " ", check.names = FALSE, row.names = 1)
+count_matrix <- read.csv("count_matrix.csv", row.names = 1, check.names = FALSE)
+metadata <- read.csv("metadata.csv", row.names = 1)
 ```
 
 ```{r}
-metadata <- metadata %>% select(Selection, Location)
+unique(metadata$Selection)
 ```
+
+## 01.2. Quick Seurat workflow (see previous classes)
 
 ```{r}
 # Create a Seurat object
@@ -41,10 +47,14 @@ DimPlot(seurat_object, reduction = "umap", group.by = "Location", label = TRUE, 
 DimPlot(seurat_object, reduction = "umap", label = TRUE, label.box = TRUE, repel = TRUE) + NoLegend()
 ```
 
+## 01.3. Selecting optimal clustering resolution
+
 ```{r}
-# Testing multiple clustering resolutions
-seurat_object <- FindClusters(seurat_object, resolution = seq(from = 0.2, to = 2, by = 0.2))
+resolutions <- seq(from = 0.2, to = 2, by = 0.2)
+seurat_object <- FindClusters(seurat_object, resolution = resolutions)
 ```
+
+### _Ad oculus_: cluster tree
 
 ```{r}
 seurat_object@meta.data
@@ -55,37 +65,40 @@ seurat_object@meta.data
 clustree(seurat_object, prefix = "SCT_snn_res.")
 ```
 
-```{r}
-pca_embeddings
-```
+### Metrics-based: silhouette score
 
 ```{r}
-# Compute silhouette scores based on PCA embeddings to evaluate clustering quality
 pca_embeddings <- Embeddings(seurat_object, reduction = "pca")
 dist_matrix <- dist(pca_embeddings)
 
+# Compute silhouette scores for each clustering resolution
 sil_scores <- sapply(resolutions, function(res) {
-  # Extract clustering for the given resolution and convert to numeric factor
-  cluster_ids <- as.numeric(as.factor(seurat_object@meta.data[[paste0("RNA_snn_res.", res)]]))
+  col_name <- paste0("SCT_snn_res.", res)
+  cluster_ids <- as.numeric(as.factor(seurat_object@meta.data[[col_name]]))
+  if (length(unique(cluster_ids)) < 2) {
+    return(NA) 
+  }
   sil <- silhouette(cluster_ids, dist_matrix)
-  mean(sil[, 3])
+  if (is.null(dim(sil))) {
+    return(NA)
+  }
+  mean(sil[, "sil_width"])
 })
 
-# Create a dataframe of average silhouette widths
 sil_df <- data.frame(Resolution = resolutions, Avg_Silhouette = sil_scores)
 print(sil_df)
 
-# Plot average silhouette width vs. clustering resolution
 ggplot(sil_df, aes(x = Resolution, y = Avg_Silhouette)) +
   geom_line() +
   geom_point() +
   theme_minimal() +
   labs(title = "Average Silhouette Score Across Clustering Resolutions",
-       y = "Average Silhouette Width")
+       y = "Average Silhouette Width") +
+  scale_x_continuous(breaks = sil_df$Resolution)
 ```
 
 ```{r}
-seurat_object <- FindClusters(seurat_object, resolution = 0.2)
+seurat_object <- FindClusters(seurat_object, resolution = 0.6)
 ```
 
 ```{r}
@@ -99,12 +112,14 @@ FeaturePlot(seurat_object, features = "OLIG1")
 ```
 
 ```{r}
-markers <- FindMarkers(seurat_object, ident.1 = "0", ident.2 = "2", min.diff.pct = 0.25)
+markers <- FindMarkers(seurat_object, ident.1 = "0", ident.2 = "2", min.diff.pct = 0.25,test.use = "Wilcoxon")
 ```
 
 ```{r}
 markers %>% filter(abs(avg_log2FC) > 0.5, p_val_adj < 0.05) %>% arrange(desc(avg_log2FC))
 ```
+
+## 01.4. Exporting as AnnotData object for future analysis
 
 ```{r}
 library(SeuratDisk)
@@ -116,5 +131,9 @@ SaveH5Seurat(seurat_object, filename = "01_object.h5Seurat")
 
 ```{r}
 Convert("01_object.h5Seurat", dest = "h5ad", overwrite = TRUE)
+```
+
+```{r}
+saveRDS(seurat_object, "01_seurat_obj.Rds")
 ```
 

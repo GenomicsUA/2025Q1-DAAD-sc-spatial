@@ -16,6 +16,10 @@ library(dplyr)
 seurat_obj <- readRDS("01_seurat_obj.Rds")
 ```
 
+```{r}
+seurat_obj
+```
+
 ## 04.2. Module score-based annotation
 
 ```{r}
@@ -53,10 +57,34 @@ celltype_markers <- FindAllMarkers(
 ```
 
 ```{r}
-top5_clusters <- cluster_markers %>% group_by(cluster) %>% mutate(pctdiff = pct.1-pct.2) %>% top_n(n = 3, wt = pctdiff) 
-top5_celltypes <- celltype_markers %>% group_by(cluster) %>% mutate(pctdiff = pct.1-pct.2) %>% top_n(n = 5, wt = pctdiff)
+celltype_markers %>% mutate(pct_diff = pct.1 - pct.2) %>% filter(p_val_adj < 0.05, avg_log2FC > 1, pct_diff > 0.3) %>% filter(cluster == "Astrocytes")
+```
+
+```{r}
+top5_clusters <- cluster_markers %>% group_by(cluster) %>% filter(p_val_adj < 0.05, avg_log2FC > 1) %>% top_n(n = 3, wt = avg_log2FC) 
+top5_celltypes <- celltype_markers %>% group_by(cluster) %>% filter(p_val_adj < 0.05, avg_log2FC > 1)  %>% top_n(n = 5, wt = avg_log2FC)
 
 DoHeatmap(subset(seurat_obj, downsample = 30), features = top5_clusters$gene, assay = "RNA", slot = "counts") + NoLegend()
 DoHeatmap(subset(seurat_obj, downsample = 30), features = top5_celltypes$gene, group.by = "assigned_celltype", assay = "RNA", slot = "counts") + NoLegend()
+```
+
+```{r}
+seurat_obj@meta.data <- seurat_obj@meta.data %>% mutate(condition_celltype = paste0(Location, "_", assigned_celltype))
+```
+
+```{r}
+unique(seurat_obj@meta.data$condition_celltype)
+```
+
+```{r}
+Idents(seurat_obj) <- seurat_obj@meta.data$condition_celltype
+```
+
+```{r}
+markers_astrocytes <- FindMarkers(seurat_obj, ident.1 = "Tumor_Astrocytes_Fibrous", ident.2 = "Periphery_Astrocytes_Fibrous")
+```
+
+```{r}
+markers_astrocytes %>% filter(abs(avg_log2FC) > 0.5, p_val_adj < 0.05) %>% arrange(avg_log2FC)
 ```
 
