@@ -1,0 +1,81 @@
+---
+title: An R Markdown document converted from "01_seurat_preprocessing.ipynb"
+output: html_document
+---
+
+## Loading and paths
+
+```{r}
+pacman::p_load(Seurat, here, "glmGamPoi")
+```
+
+```{r}
+here::here()
+data_path <- here("Module_2", "S14", "01_data")
+dataset <- Load10X_Spatial(data.dir = data_path, 
+                            filename = "CytAssist_11mm_FFPE_Human_Lung_Cancer_filtered_feature_bc_matrix.h5")
+```
+
+## Seurat analysis
+
+```{r}
+# dataset <- SCTransform(dataset, assay = "Spatial", verbose = TRUE,
+#                         ncells = 3000, variable.features.n3 = 1500)
+
+dataset <- NormalizeData(dataset, assay = "Spatial", 
+                        normalization.method = "LogNormalize", 
+                        scale.factor = 10000)
+```
+
+```{r}
+dataset <- FindVariableFeatures(dataset)
+dataset <- ScaleData(dataset)
+```
+
+```{r}
+#SpatialFeaturePlot(dataset, features = c(...))
+```
+
+```{r}
+dataset <- RunPCA(dataset, assay = "Spatial", verbose = FALSE)
+dataset <- FindNeighbors(dataset, reduction = "pca", dims = 1:30)
+dataset <- FindClusters(dataset, verbose = FALSE)
+dataset <- RunUMAP(dataset, reduction = "pca", dims = 1:30)
+```
+
+```{r}
+DimPlot(dataset, reduction = "umap", label = TRUE)
+SpatialDimPlot(dataset, label = TRUE, label.size = 6, label.box = TRUE)
+```
+
+```{r}
+SpatialFeaturePlot(dataset, features = c("HER2", "ERBB1", "TP53", "KRAS", "MYC", "RB2"))
+```
+
+```{r}
+SpatialFeaturePlot(dataset, features = c("CD2"))
+```
+
+```{r}
+SpatialFeaturePlot(dataset, features = c("MKI67"))
+```
+
+```{r}
+markers <- FindAllMarkers(dataset, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+```
+
+## Outputs
+
+```{r}
+dataset_sce <- as.SingleCellExperiment(dataset)
+```
+
+```{r}
+dataset_sce
+```
+
+```{r}
+saveRDS(dataset, file = here("Module_2", "S14", "03_outputs", "dataset.rds"))
+saveRDS(dataset_sce, file = here("Module_2", "S14", "03_outputs", "dataset_sce.rds"))
+```
+

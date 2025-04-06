@@ -1,0 +1,57 @@
+---
+title: An R Markdown document converted from "02_spot_deconvolution.ipynb"
+output: html_document
+---
+
+```{r}
+pacman::p_load(BayesSpace, SingleCellExperiment, ggplot2, here)
+here::here()
+```
+
+```{r}
+dataset <- readVisium(here("Module_2", "S14", "01_data"))
+```
+
+```{r}
+dataset <- spatialPreprocess(dataset, platform="Visium", 
+                              n.PCs=15, n.HVGs=2000, log.normalize=TRUE)
+```
+
+```{r}
+dataset
+```
+
+```{r}
+dataset <- qTune(dataset, qs=seq(2, 10), platform="Visium", d=7, cores=2)
+qPlot(dataset)
+```
+
+```{r}
+dataset = spatialCluster(dataset, nrep = 1000, burn.in = 100, q = 7)
+```
+
+```{r}
+clusterPlot(dataset)
+```
+
+```{r}
+dataset_enhanced <- spatialEnhance(dataset, q=7, platform="Visium", d=7,
+                                    model="t", gamma=2,
+                                    jitter.prior=0.3, jitter.scale=3.5,
+                                    nrep=1000, burn.in=100,
+                                    save.chain=FALSE, cores = 1)
+```
+
+```{r}
+markers <- c("MKI67", "CD2", "EGFR", "MYC", "BRAF", "MET")
+dataset_enhanced <- enhanceFeatures(dataset_enhanced, dataset,
+                                    model = "lm", 
+                                     feature_names=markers,
+                                     nrounds=0)
+```
+
+```{r}
+featurePlot(dataset_enhanced, "MKI67")
+featurePlot(dataset, "MKI67")                 
+```
+

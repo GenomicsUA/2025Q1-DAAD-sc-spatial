@@ -1,2 +1,7 @@
 data/*
 .Rhistory
+.pixi
+S14.zip
+Module_2/S14/.gitattributes
+Module_2/S14/.gitignore
+Module_2/S14/pixi.lock
