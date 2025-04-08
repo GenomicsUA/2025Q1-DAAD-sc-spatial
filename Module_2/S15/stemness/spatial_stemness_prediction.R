@@ -47,7 +47,7 @@ spData <- Load10X_Spatial(
   image = NULL
 )
 
-plot2 <- SpatialFeaturePlot(spData, features = "nCount_Spatial") + 
+plot2 <- SpatialFeaturePlot(spData, features = "nCount_Spatial", image.alpha = 0.2) + 
   theme(legend.position = "right")
 
 print(plot2)
@@ -70,12 +70,14 @@ gene_matrix[1:10, 1:10]
 
 # Load Stemness model 
 load("./model_RNA_MALTA.2018.Rda")
-w = mm$w
+w = mm$w #extracting the stemness model weights (w) from the loaded object mm
 w[1:5]
 length(w) #12953 (number of genes on the model)
 # Filter matrix expression by the genes on stemness model
 matrix = gene_matrix
 length(intersect(rownames(matrix), names(w))) #12259 
+
+#filters the gene expression matrix to only include the genes that are present in the pretrained model (w).
 predict.DATA = matrix[rownames(matrix) %in% names(w) ,]
 length(rownames(predict.DATA)) # 12259
 w = w[ rownames(predict.DATA) ]
@@ -102,9 +104,6 @@ cellbarcodes_seq_s <- rownames(s)
 all(cellbarcodes_seq_ori %in% cellbarcodes_seq_s) #TRUE
 identical(cellbarcodes_seq_ori, cellbarcodes_seq_s) #TRUE
 
-# Create a stemness index column in metadata
+# stemness scores to Seurat metadata
 spData@meta.data$stemness <- s$stemness
-SpatialFeaturePlot(spData, features = c("stemness"))
-
-
-
+SpatialFeaturePlot(spData, features = c("stemness"), image.alpha = 0)
