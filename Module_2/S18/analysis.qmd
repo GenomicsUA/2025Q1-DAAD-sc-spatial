@@ -1,0 +1,116 @@
+---
+title: "PBMC3K Explorer Demo"
+author: "Genomics UA Enjoyer"
+date: "`r Sys.Date()`"
+format:
+  html:
+    theme: flatly
+    highlight-style: github
+    css: styles.css
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    number-sections: true
+    code-copy: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+# PBMC3K Explorer Demo
+
+This Quarto notebook demonstrates static plots generated from the PBMC3K dataset using **Seurat** and integrates feature, violin, and dot plots into a tabbed layout. A table of marker genes is also included.
+
+
+
+# Introduction
+
+This Quarto notebook provides an interactive demonstration of single-cell RNA-seq (scRNA-seq) analysis on the 3k Peripheral Blood Mononuclear Cells (PBMC) dataset. We'll explore data preprocessing, dimensionality reduction, clustering, and marker gene visualization using Seurat.
+
+# Methods
+
+We processed raw counts using SCTransform for normalization and variance stabilization, then ran PCA, neighbor detection, clustering, and UMAP embedding to reveal cell populations.
+
+
+```{r}
+# Load libraries
+library(SeuratData)
+library(Seurat)
+library(patchwork)
+library(ggpubr)
+library(viridis)
+library(DT)
+
+
+# Load and preprocess PBMC3K
+InstallData("pbmc3k")
+pbmc3k <- LoadData("pbmc3k")
+pbmc3k <- subset(pbmc3k, subset = seurat_annotations != "NA")
+pbmc3k <- SCTransform(pbmc3k, verbose = FALSE)
+pbmc3k <- RunPCA(pbmc3k, features = VariableFeatures(pbmc3k), verbose = FALSE)
+pbmc3k <- FindNeighbors(pbmc3k, dims = 1:30, verbose = FALSE)
+pbmc3k <- FindClusters(pbmc3k, verbose = FALSE)
+pbmc3k <- RunUMAP(pbmc3k, dims = 1:30, verbose = FALSE)
+Idents(pbmc3k) <- pbmc3k$seurat_annotations
+markers <- FindAllMarkers(pbmc3k, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+
+# Define features
+features <- c("CD3D", "MS4A1", "LYZ")
+```
+
+## Plots {.tabset}
+
+### Feature Plot
+
+```{r feature-plot, fig-width: 8, fig-height: 6}
+plots <- FeaturePlot(
+  pbmc3k,
+  features = features,
+  cols = c("lightgrey", "blue", "red"),
+  pt.size = 1,
+  combine = FALSE
+)
+wrap_plots(plots, ncol = min(length(plots), 3)) +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+```
+
+### Violin Plot
+
+```{r violin-plot, fig-width: 8, fig-height: 4}
+VlnPlot(
+  pbmc3k,
+  features = features,
+  pt.size = 0
+) +
+  stat_compare_means(aes(label = ..p.signif..)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Dot Plot
+
+```{r dot-plot, fig-width: 8, fig-height: 4}
+DotPlot(
+  pbmc3k,
+  features = features,
+  dot.scale = 8
+) +
+  RotatedAxis() +
+  scale_color_viridis(option = "D") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Marker Genes Table
+
+```{r markers-table}
+DT::datatable(
+  markers,
+  filter = "top",
+  options = list(pageLength = 20, scrollX = TRUE),
+  rownames = FALSE
+)
+```
+
+# Conclusion
+This demo highlights how Seurat workflows can quickly reveal cellular composition and marker expression patterns in scRNA-seq data. Modify the gene list and visualization parameters to further explore your dataset.

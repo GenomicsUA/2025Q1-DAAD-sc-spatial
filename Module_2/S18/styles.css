@@ -1,0 +1,54 @@
+/* === Typography === */
+body {
+    font-family: "Source Serif Pro", serif;
+    line-height: 1.6;
+  }
+  code, pre {
+    font-family: "Fira Code", monospace;
+    font-size: 0.95em;
+  }
+  
+  /* === Headings === */
+  h1, h2, h3 {
+    color: #005f73;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+  }
+  
+  /* === Tabset styling === */
+  .nav-tabs {
+    border-bottom: 2px solid #0a9396;
+  }
+  .nav-tabs .nav-link {
+    color: #0a9396;
+    border: 1px solid transparent;
+    border-radius: 0.25rem 0.25rem 0 0;
+  }
+  .nav-tabs .nav-link.active {
+    background-color: #94d2bd;
+    border-color: #0a9396 #0a9396 transparent;
+    color: #001219;
+  }
+  
+  /* === Table styling === */
+  table {
+    border-collapse: collapse;
+  }
+  table th, table td {
+    border: 1px solid #ccc;
+    padding: 0.5em;
+  }
+  
+  /* === Figure captions === */
+  .caption {
+    font-style: italic;
+    color: #555;
+    text-align: center;
+    margin-top: 0.25em;
+  }
+  
+  /* === Button for copy code === */
+  .quarto-copy-button {
+    background: #ee9b00;
+    color: white;
+  }
